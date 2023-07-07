@@ -1,0 +1,109 @@
+USE PLUM_ASSIGNMENT;
+
+CREATE TABLE if not exists DA_Assignment(
+Id INT PRIMARY KEY,
+Requester_id BIGINT,
+Groupss VARCHAR(25),
+Status VARCHAR(20),
+Priority VARCHAR(15),
+Via VARCHAR(50),
+Created_at DATETIME,
+Updated_at DATETIME,
+Assigned_at DATETIME,
+Initially_assigned_at DATETIME,
+Solved_at DATETIME,
+Resolution_time INT,
+Satisfaction_Score VARCHAR(25),
+Reopens INT,
+Replies INT,
+First_reply_time_in_minutes_within_business_hours INT,
+First_resolution_time_in_minutes INT,
+First_resolution_time_in_minutes_within_business_hours INT,
+Full_resolution_time_in_minutes INT,
+Full_resolution_time_in_minutes_within_business_hours INT,
+Requester_wait_time_in_minutes INT,
+Requester_wait_time_in_minutes_within_business_hours INT,
+Manual_Tagging_of_Categories_list VARCHAR(60)
+);
+
+SELECT * FROM DA_ASSIGNMENT;
+
+-- Unique Requester id
+SELECT COUNT(DISTINCT Requester_id) FROM DA_ASSIGNMENT;
+
+SELECT COUNT(DISTINCT Id) FROM DA_ASSIGNMENT;
+
+-- Each groups total number of id based on their status & Priority
+SELECT GROUPSS, STATUS, PRIORITY, COUNT(ID) FROM DA_ASSIGNMENT
+GROUP BY 1,2,3
+ORDER BY 1;
+
+-- Calculate Average time taken to solve queries for each group
+CREATE OR REPLACE TABLE OVERALL_DETAILS AS (
+SELECT GROUPSS, COUNT(*) AS total_requests, AVG((Resolution_time)/60) AS avg_resolution_time,
+       AVG((First_reply_time_in_minutes_within_business_hours)/60) AS Avg_First_Reply_Time,
+       AVG((First_resolution_time_in_minutes_within_business_hours)/60) AS Avg_First_resolution_Time,
+       AVG((Full_resolution_time_in_minutes_within_business_hours)/60) AS Avg_Full_resolution_Time,
+       AVG((Requester_wait_time_in_minutes_within_business_hours)/60) AS Avg_Requester_Wait_Time,
+       (Avg_First_resolution_Time - Avg_First_reply_Time) as time_taken_to_reach_first_resolution,
+       (Avg_Full_resolution_Time - Avg_First_resolution_Time) as time_taken_for_full_resolution
+FROM DA_ASSIGNMENT
+GROUP BY 1
+ORDER BY avg_resolution_time DESC);
+
+
+-- Calculate efficiency numbers
+CREATE OR REPLACE TABLE OVERALL_VIEW AS (
+SELECT Groupss,
+    COUNT(*) AS TotalTickets,
+    SUM(CASE WHEN (Full_resolution_time_in_minutes_within_business_hours/ 60) <= 60 THEN 1 ELSE 0 END) AS 
+    TicketsResolvedWithin1Hour,
+    SUM(CASE WHEN (Full_resolution_time_in_minutes_within_business_hours/ 60) > 60 AND 
+    (Full_resolution_time_in_minutes_within_business_hours <= 120/60) THEN 1 ELSE 0 END) AS TicketsResolvedWithin2Hours,
+    SUM(CASE WHEN (Full_resolution_time_in_minutes_within_business_hours/60) > 120 AND 
+    (Full_resolution_time_in_minutes_within_business_hours/60) <= 240 THEN 1 ELSE 0 END) AS TicketsResolvedWithin4Hours,
+    SUM(CASE WHEN (Full_resolution_time_in_minutes_within_business_hours/60) > 240 THEN 1 ELSE 0 END) AS 
+    TicketsResolvedAfter4Hours,
+    AVG((Full_resolution_time_in_minutes_within_business_hours)/60) AS AverageResolutionTime
+FROM DA_ASSIGNMENT
+group by 1);
+
+
+-- Average Resolution Time by Priority
+CREATE TABLE PRIORITY_CASES AS (
+SELECT Priority, AVG((Full_resolution_time_in_minutes_within_business_hours)/60) AS Avg_Resolution_Time
+FROM DA_ASSIGNMENT
+GROUP BY 1);
+
+
+-- Create a table showing average resolution time by ticket category
+CREATE TABLE category_resolution_time AS
+SELECT Manual_Tagging_of_Categories_list AS Category,
+  AVG((Full_resolution_time_in_minutes_within_business_hours)/60) AS Avg_Resolution_Time
+FROM DA_ASSIGNMENT
+GROUP BY 1
+ORDER BY Avg_Resolution_Time DESC;
+
+
+-- Count of 0 reopens for each groups
+CREATE TABLE ZERO_REOPEN_CASES AS (
+SELECT Groupss, COUNT(*) AS total_cases
+FROM DA_ASSIGNMENT
+WHERE Reopens = 0
+GROUP BY Groupss);
+
+
+-- % of 0 reopen cases from the total cases of each group
+CREATE TABLE ZERO_PERC_REOPEN_CASES AS (
+SELECT Groupss, COUNT(*) AS total_cases,
+  COUNT(CASE WHEN Reopens = 0 THEN 1 END) * 100.0 / COUNT(*) AS percentage_zero_reopens
+FROM DA_ASSIGNMENT
+GROUP BY Groupss);
+
+
+-- Count of more than 5 reopens for each groups
+CREATE TABLE MORE_THAN_FIVE_REOPEN_CASES AS (
+SELECT Groupss, COUNT(*) AS count
+FROM DA_ASSIGNMENT
+WHERE Reopens > 5
+GROUP BY Groupss);
